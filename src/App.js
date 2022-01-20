@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import Post from './Post';
 import { db, auth } from './firebasedb';
-import { collection, doc, getDocs } from "firebase/firestore";
-import { createUserWithEmailAndPassword } from "firebase/auth"
+import { collection, getDocs } from "firebase/firestore";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "firebase/auth"
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { Input } from '@mui/material';
+import ImageUpload from './ImageUpload';
 
 const style = {
   position: 'absolute',
@@ -30,19 +31,12 @@ const App = () => {
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
   const [user, setUser] = useState(null)
+  const [openLogIn, setOpenLogIn] = useState(false)
 
-  /* useEffect(() => {
+  useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
       if (authUser) {
-        console.log(authUser)
         setUser(authUser)
-        if (authUser.displayName) {
-
-        } else {
-          return authUser.updateProfile({
-            displayName: username
-          })
-        }
       } else {
         setUser(null)
       }
@@ -50,11 +44,12 @@ const App = () => {
     return () => {
       unsubscribe();
     }
-  }, [user, username]) */
+  }, [user, username])
 
   useEffect(() => {
     const getPosts = async () => {
-      const querySnapshot = await getDocs(collection(db, "posts"));
+
+      const querySnapshot = await getDocs(collection(db, "posts"))
       querySnapshot.forEach((doc) => {
         setPosts(prevPost => [{ id: doc.id, post: doc.data() }, ...prevPost])
       });
@@ -63,17 +58,34 @@ const App = () => {
   }, [])
 
   const signUp = async (event) => {
-    console.log(event)
     event.preventDefault()
     try {
       const user = await createUserWithEmailAndPassword(auth, email, password)
-      console.log(user)
+        .then((authUser) => {
+          return updateProfile(authUser.user, {
+            displayName: username
+          })
+        })
     } catch (error) {
       console.log(error.message)
     }
+    setOpen(false)
   }
+
+  const signIn = async (event) => {
+    event.preventDefault()
+    try {
+      const user = await signInWithEmailAndPassword(auth, email, password)
+    } catch (error) {
+      console.log(error.message)
+    }
+    setOpenLogIn(false)
+  }
+
   return (
     <div className="app">
+
+
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -106,20 +118,64 @@ const App = () => {
           </form>
         </Box>
       </Modal>
+
+      <Modal
+        open={openLogIn}
+        onClose={() => setOpenLogIn(false)}
+      >
+        <Box sx={style}>
+          <form className='app_signup'>
+            <center>
+              <img
+                className="app_headerImage"
+                src="https://www.instagram.com/static/images/web/mobile_nav_type_logo.png/735145cfe0a4.png"
+                alt=""
+              />
+            </center>
+            <Input
+              type="text"
+              placeholder="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              type="password"
+              placeholder="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)} />
+            <Button type="submit" onClick={(event) => signIn(event)}>Log In</Button>
+          </form>
+        </Box>
+      </Modal>
+
       <div className="app_header">
         <img
           className="app_headerImage"
           src="https://www.instagram.com/static/images/web/mobile_nav_type_logo.png/735145cfe0a4.png"
           alt=""
         />
+        {user ? (
+          <Button onClick={() => auth.signOut()}>Logout</Button>
+        ) : (
+          <div className='app_login'>
+            <Button onClick={() => setOpenLogIn(true)}>Log in</Button>
+            <Button onClick={() => setOpen(true)}>Sign Up</Button>
+          </div>
+        )
+        }
       </div>
-      <Button onClick={() => setOpen(true)}>Sign Up</Button>
-      <h1>Iniciooooo</h1>
-      {
-        posts.map(({ post, id }) => (
-          <Post username={post.username} caption={post.caption} imageUrl={post.imageUrl} key={id} />
-        ))
-      }
+
+      <div className='app_posts'>
+        {
+          posts.map(({ post, id }) => (
+            <Post username={post.username} postId={id} user={user} caption={post.caption} imageUrl={post.imageUrl} key={id} />
+          ))
+        }
+      </div>
+
+      {user?.displayName ? (
+        <ImageUpload username={user.displayName} />) : (
+        <h3>You need to login to upload</h3>
+      )}
 
     </div>
   );
